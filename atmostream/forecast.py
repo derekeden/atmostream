@@ -180,15 +180,15 @@ class Forecast:
         p = self.download_params
         avail_files = self.get_available_files(p['date'], p['forecast'])
         out_files = self._filter_files_by_vars(avail_files, p['variables'])
-        #
-        #
-        #hack for now
-        out_files = [l for l in out_files if l.lower().endswith('.grib2')]
-        out_files = out_files[:1]
-        print(out_files)
-        #
-        #
-        #
+        # #
+        # #
+        # #hack for now
+        # out_files = [l for l in out_files if l.lower().endswith('.grib2')]
+        # out_files = out_files[:1]
+        # print(out_files)
+        # #
+        # #
+        # #
         if check_output_path:
             exists = glob.glob(self._download_path+'/*') 
             exists = [os.path.basename(e) for e in exists if os.path.isfile(e)]

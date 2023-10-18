@@ -37,4 +37,8 @@ This library should work on both Windows and Linux, Python versions 3.9+.
 
 ## Examples
 
-See the examples.py script in the repository. It shows how to set up a streaming service for each of the supported forecast products.
+See the examples.py script in the repository. 
+
+It shows how to set up a streaming service for each of the supported forecast products.
+
+Simply start streaming, and watch the data start to collect!

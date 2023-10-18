@@ -25,6 +25,8 @@ Currently, the supported forecast products are:
 
 And more are being added.
 
+Right now, only certain variables (winds, pressure, humidity, solar radiation, precipitation) are supported. General support is coming for all forecast variables as the support to convert to MIKE DFS files is developed for all the variable types.
+
 ## Installation
 
 To install this library, clone the GitHub repository to your local machine.

@@ -12,12 +12,15 @@ This library makes it easy to download, or continuously stream the latest raw fo
 
 Currently, the supported forecast products are:
 
-HRDPS Continental
-HRDPS North
-RDPS
-GDPS
-GEPS
-NAM CONUS Nest
+**Environment Canada**
+* HRDPS Continental
+* HRDPS North
+* RDPS
+* GDPS
+* GEPS
+
+**NOAA/NCEP**
+* NAM CONUS Nest
 
 And more are being added.
 

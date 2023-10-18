@@ -1,3 +1,5 @@
+################################################################################
+
 import os
 from datetime import datetime as dt
 import requests
@@ -7,7 +9,10 @@ import glob
 from tqdm import tqdm
 from time import sleep
 import pandas as pd
-from mikeio_support import to_dfs, remove_dfs
+
+from .mikeio_support import to_dfs, remove_dfs
+
+################################################################################
 
 supported_models = ['HRDPS_continental',
                     'HRDPS_north',
@@ -45,8 +50,10 @@ def source_mapper(model):
             'CFS': 'NOAA'}
     return mapper[model]
 
+################################################################################
+
 class Forecast:
-    ############################################################################
+    
     ############################################################################
     
     def __init__(self, model, output_path=None):
@@ -55,7 +62,6 @@ class Forecast:
         self.source = source_mapper(model)
         self.set_output_path(output_path)
         
-    ############################################################################
     ############################################################################
     
     @property
@@ -72,18 +78,25 @@ class Forecast:
         return self._get_data_url()
     
     @property
+    def supported_vars(self):
+        return self._get_supported_vars()
+    
+    @property
     def output_path(self):
         return self._output_path
     
     @property 
     def download_params(self):
+        msg = 'Forecast has no download parameters, run self.set_download_params first...'
+        assert hasattr(self, '_download_params'), msg
         return self._download_params
     
     @property 
     def stream_params(self):
+        msg = 'Forecast has no stream parameters, run self.set_stream_params first...'
+        assert hasattr(self, '_stream_params'), msg
         return self._stream_params
     
-    ############################################################################
     ############################################################################
     
     def set_output_path(self, pth):
@@ -178,15 +191,6 @@ class Forecast:
         p = self.download_params
         avail_files = self.get_available_files(p['date'], p['forecast'])
         out_files = self._filter_files_by_vars(avail_files, p['variables'])
-        # #
-        # #
-        # #hack for now
-        out_files = [l for l in out_files if l.lower().endswith('.grib2')]
-        out_files = out_files[:1]
-        # print(out_files)
-        # #
-        # #
-        # #
         if check_output_path:
             exists = glob.glob(self._download_path+'/*') 
             exists = [os.path.basename(e) for e in exists if os.path.isfile(e)]
@@ -406,7 +410,6 @@ class Forecast:
             self.stream()
                      
     ############################################################################
-    ############################################################################
     
     #get model website
     def _get_meta_url(self):
@@ -614,7 +617,6 @@ class Forecast:
         with open(f'{out_pth}/{filename}', 'wb') as f:
             f.write(dl.content)
             
-    ############################################################################
-    ############################################################################
+############################################################################
     
     

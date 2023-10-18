@@ -1,3 +1,5 @@
+################################################################################
+
 import mikeio
 from mikeio import Grid2D, EUMType, EUMUnit, ItemInfo
 import glob
@@ -6,11 +8,12 @@ from datetime import timedelta as td
 import re
 import xarray as xr
 import numpy as np
-import pyproj
 import pandas as pd
 from tqdm import tqdm
 import os
 from more_itertools import sort_together
+
+################################################################################
 
 def var_mapper(var):
     mapper = {'WIND_AGL-10m':{'item':EUMType.Wind_speed,
@@ -358,3 +361,5 @@ def combine_dfs(files, outfile):
     #make output
     out = mikeio.Dataset(dat)
     out.to_dfs(outfile)
+    
+################################################################################

@@ -12,8 +12,14 @@ setup(
     description="A pythonic approach to download, stream, and process various atmopsheric forecast models",
     include_package_data=True,
     packages=find_packages(),
-    install_requires=[],
-    dependency_links=[],
-)
+    install_requires=["beautifulsoup4",
+                      "requests",
+                      "tqdm",
+                      "pandas",
+                      "mikeio",
+                      "xarray",
+                      "numpy",
+                      "more_itertools"],
+    dependency_links=[])
 
 ################################################################################

@@ -21,6 +21,7 @@ Currently, the supported forecast products are:
 
 **NOAA/NCEP**
 * NAM CONUS Nest
+* CFS
 
 And more are being added.
 

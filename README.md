@@ -9,10 +9,15 @@ This is a library that is meant to work with Environment Canada and NOAA atmosph
 Currently, the supported forecast products are:
 
 HRDPS Continental
+
 HRDPS North
+
 RDPS
+
 GDPS
+
 GEPS
+
 NAM CONUS Nest
 
 And more are being added.

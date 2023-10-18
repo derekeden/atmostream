@@ -2,3 +2,4 @@ verify mikeio projection strings
 make a much better stream downloader method
 finish rest of forecast products
 better merger and concatenator for dfs
+add spatial clipping

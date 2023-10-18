@@ -17,7 +17,13 @@ def var_mapper(var):
                              'unit':EUMUnit.meter_per_sec},
               'WDIR_AGL-10m':{'item':EUMType.Wind_Direction,
                              'unit':EUMUnit.degree},
+              'WIND_TGL_10':{'item':EUMType.Wind_speed,
+                             'unit':EUMUnit.meter_per_sec},
+              'WDIR_TGL_10':{'item':EUMType.Wind_Direction,
+                             'unit':EUMUnit.degree},
               'PRMSL_MSL':{'item':EUMType.Pressure,
+                             'unit':EUMUnit.pascal},
+              'PRES_SFC':{'item':EUMType.Pressure,
                              'unit':EUMUnit.pascal},
               'PRES_Sfc':{'item':EUMType.Pressure,
                              'unit':EUMUnit.pascal},
@@ -35,6 +41,18 @@ def var_mapper(var):
                           'unit':EUMUnit.meter_per_sec},
               'wnd10m_v':{'item':EUMType.v_velocity_component,
                           'unit':EUMUnit.meter_per_sec},
+              'UGRD_TGL_10':{'item':EUMType.u_velocity_component,
+                          'unit':EUMUnit.meter_per_sec},
+              'VGRD_TGL_10':{'item':EUMType.v_velocity_component,
+                          'unit':EUMUnit.meter_per_sec},
+              'UGRD_TGL_10m':{'item':EUMType.u_velocity_component,
+                          'unit':EUMUnit.meter_per_sec},
+              'VGRD_TGL_10m':{'item':EUMType.v_velocity_component,
+                          'unit':EUMUnit.meter_per_sec},
+              'UGRD_AGL-10m':{'item':EUMType.u_velocity_component,
+                          'unit':EUMUnit.meter_per_sec},
+              'VGRD_AGL-10m':{'item':EUMType.v_velocity_component,
+                          'unit':EUMUnit.meter_per_sec},
               'u10':{'item':EUMType.u_velocity_component,
                           'unit':EUMUnit.meter_per_sec},
               'v10':{'item':EUMType.v_velocity_component,
@@ -44,10 +62,18 @@ def var_mapper(var):
     return mapper[var]
 
 def file_to_time(file, model):
-    if 'HRDPS' in model:
+    if model == 'HRDPS_continental':
         time = dt.strptime(re.search('\d{8}T\d{2}', file).group(), '%Y%m%dT%H')
         forecast_hour = td(hours=int(re.search('PT(\d+)H', file).group(1)))
         outtime = time+forecast_hour
+    elif model == 'HRDPS_north':
+        time = dt.strptime(re.search('\d{10}', file).group(), '%Y%m%d%H')
+        forecast_hour = td(hours=int(re.search('P(\d+)-', file).group(1)))
+        outtime = time+forecast_hour
+    elif model in ['RDPS', 'GDPS', 'GEPS']:
+        time = dt.strptime(re.search('\d{10}', file).group(), '%Y%m%d%H')
+        forecast_hour = td(hours=int(re.search('P(\d+).', file).group(1)))
+        outtime = time+forecast_hour  
     return outtime
 
 def get_model_grid(model):
@@ -59,6 +85,34 @@ def get_model_grid(model):
                            'dx': 0.0225,
                            'dy': 0.0225,
                            'projection':'PROJCS["EC_Conti",GEOGCS["Unused",DATUM["User defined",SPHEROID["Sphere (Radius = 6371229)",6371229,0]],PRIMEM["Greenwich",0],UNIT["Degree",0.0174532925199433]],PROJECTION["Rotated_Longitude_Latitude"],PARAMETER["Longitude_Of_South_Pole",-114.694858],PARAMETER["Latitude_Of_South_Pole",-36.08852],PARAMETER["Angle_Of_Rotation",0],UNIT["Degree",1]]'},
+            'HRDPS_north': {'ny': 825, 
+                           'nx': 1465, 
+                           'orientation':0,
+                           'origin':(-970965.2744659025920555,-2103651.7371754324994981),
+                           'dx': 2500,
+                           'dy': 2500,
+                           'projection':'PROJCS["unnamed",GEOGCS["Unused",DATUM["D_unnamed",SPHEROID["Sphere",6371229.0,0.0]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Stereographic_North_Pole"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-116.0],PARAMETER["Standard_Parallel_1",60.0],UNIT["Meter",1.0]]'},
+            'RDPS': {'ny': 824, 
+                           'nx': 935, 
+                           'orientation':0,
+                           'origin':(-4556441.4033152451738715,-7319317.8588340496644378),
+                           'dx': 10000,
+                           'dy': 10000,
+                           'projection':'PROJCS["unnamed",GEOGCS["Unused",DATUM["D_unnamed",SPHEROID["Sphere",6371229.0,0.0]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Stereographic_North_Pole"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-111.0],PARAMETER["Standard_Parallel_1",60.0],UNIT["Meter",1.0]]'},
+            'GDPS': {'ny': 1201, 
+                           'nx': 2400, 
+                           'orientation':0,
+                           'origin':(-180,-90),
+                           'dx': 0.15,
+                           'dy': 0.15,
+                           'projection':'LONG/LAT'},
+            'GEPS': {'ny': 361, 
+                           'nx': 720, 
+                           'orientation':0,
+                           'origin':(-180,-90),
+                           'dx': 0.5,
+                           'dy': 0.5,
+                           'projection':'LONG/LAT'},
             'CFS': {'ny': 190, 
                     'nx': 384, 
                     'orientation':0,
@@ -69,18 +123,17 @@ def get_model_grid(model):
                     'projection':'LONG/LAT'},
             'NAM_conusnest': {'ny': 1059, 
                            'nx': 1799, 
-                           'orientation':0.15,
-                           'origin':(-2700339.06887162, -1597145.996848),
+                           'orientation':0,
+                           'origin':(-2697573.25, -1587306),
                            'dx': 3000.0,
                            'dy': 3000.0,
-                        'projection':'PROJCS["NAM_conusnest",GEOGCS["Unused",DATUM["D_unnamed",SPHEROID["Sphere",6371229.0,0.0]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-97.5],PARAMETER["Standard_Parallel_1",38.5],PARAMETER["Standard_Parallel_2",38.5],PARAMETER["Latitude_Of_Origin",38.5],UNIT["Meter",1.0]]'}
+                        'projection':'PROJCS["Lambert Conformal Conic NOAA", GEOGCS["Unused", DATUM["User defined", SPHEROID["Sphere (Radius =6371229)", 6371229.0, 0]], PRIMEM["Greenwich", 0], UNIT["Degree", 0.0174532925199433]], PROJECTION["Lambert_Conformal_Conic_1SP"], PARAMETER["False_Easting", 0.0], PARAMETER["False_Northing", 0], PARAMETER["Central_Meridian", -97.5], PARAMETER["Scale_Factor", 1.0], PARAMETER["Latitude_Of_Origin", 38.5], UNIT["Meter", 1.0]]'}
             }
     return grid[model]
 
 def to_dfs(folder, source, model, vars):
     if source == 'EC':
-        if 'HRDPS' in model:
-            HRDPS_to_dfs(folder, vars, model)
+            EC_to_dfs(folder, vars, model)
     elif source == 'NOAA':
         if 'cfs' == model.lower():
             CFS_to_dfs(folder, vars, model)
@@ -89,13 +142,14 @@ def to_dfs(folder, source, model, vars):
 
 def remove_dfs(folder, source, model, vars):
     if source == 'EC':
-        if 'HRDPS' in model:
-            HRDPS_dfs_remove(folder, vars)
+            EC_grib_remove(folder, vars)
     elif source == 'NOAA':
         if 'cfs' == model.lower():
             CFS_dfs_remove(folder, vars)
+        if model.lower().startswith('nam'):
+            NAM_dfs_remove(folder)
             
-def HRDPS_dfs_remove(folder, vars):
+def EC_grib_remove(folder, vars):
     var_files = [f for f in glob.glob(f'{folder}/*.grib2') if any([v in f for v in vars])]
     for f in var_files:
         os.remove(f)
@@ -110,19 +164,30 @@ def CFS_dfs_remove(folder, vars):
     var_files = [f for f in glob.glob(f'{folder}/*.grb2*idx') if any([v in f for v in vars])]
     for f in var_files:
         os.remove(f)
-            
-def HRDPS_to_dfs(folder, vars, model):
+        
+def NAM_dfs_remove(folder):
+    var_files = [f for f in glob.glob(f'{folder}/*.grb2') if f.lower().startswith('nam.')]
+    for f in var_files:
+        os.remove(f)
+    var_files = [f for f in glob.glob(f'{folder}/*.grb2*idx') if f.lower().startswith('nam.')]
+    for f in var_files:
+        os.remove(f)
+
+def EC_to_dfs(folder, vars, model):
     var_files = {var:[f for f in glob.glob(f'{folder}/*.grib2') if var in f] for var in vars}
     grid = Grid2D(**get_model_grid(model))
     for var in tqdm(vars, desc=f'{folder}...'):
         files = var_files[var]
         if len(files) == 0:
             continue
-        time = [file_to_time(f, 'HRDPS') for f in files]
+        time = [file_to_time(f, model) for f in files]
         typ, unit = var_mapper(var).values()
         data = []
         for file in tqdm(files, desc=var):
-            f = xr.open_dataset(file)
+            if model == 'GEPS':
+                f = xr.open_dataset(file, filter_by_keys={'dataType':'cf'})
+            else:
+                f = xr.open_dataset(file)
             dat = f.variables[list(f.variables.keys())[-1]].values
             data.append(dat)
         data = np.array(data)

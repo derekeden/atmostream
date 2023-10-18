@@ -9,14 +9,51 @@ from time import sleep
 import pandas as pd
 from mikeio_support import to_dfs, remove_dfs
 
+supported_models = ['HRDPS_continental',
+                    'HRDPS_north',
+                    'RDPS',
+                    'GDPS',
+                    'GEPS',
+                    'HRRR_conus',
+                    'HRRR_alaska',
+                    'GFS_0p25',
+                    'GFS_0p50',
+                    'GFS_1p00',
+                    'NAM_bgrdsf',
+                    'NAM_conusnest',
+                    'NAM_alaskanest',
+                    'NAM_hawaiinest',
+                    'NAM_prinest',
+                    'CFS']
+
+def source_mapper(model):
+    mapper = {'HRDPS_continental': 'EC',
+            'HRDPS_north': 'EC',
+            'RDPS': 'EC',
+            'GDPS': 'EC',
+            'GEPS': 'EC',
+            'HRRR_conus': 'NOAA',
+            'HRRR_alaska': 'NOAA',
+            'GFS_0p25':'NOAA',
+            'GFS_0p50':'NOAA',
+            'GFS_1p00':'NOAA',
+            'NAM_bgrdsf': 'NOAA',
+            'NAM_conusnest': 'NOAA',
+            'NAM_alaskanest': 'NOAA',
+            'NAM_hawaiinest': 'NOAA',
+            'NAM_prinest': 'NOAA',
+            'CFS': 'NOAA'}
+    return mapper[model]
+
 class Forecast:
     ############################################################################
     ############################################################################
     
-    def __init__(self, source, model, out_pth=None):
-        self.source = source
+    def __init__(self, model, output_path=None):
+        assert model in supported_models, f"Choose a model from: {supported_models}"
         self.model = model
-        self.set_output_path(out_pth)
+        self.source = source_mapper(model)
+        self.set_output_path(output_path)
         
     ############################################################################
     ############################################################################
@@ -25,10 +62,6 @@ class Forecast:
     def status(self):
         p = requests.get(self.data_url)
         return p.status_code
-    
-    @property
-    def resolution(self):
-        return self._get_resolution()
     
     @property
     def meta_url(self):
@@ -60,7 +93,6 @@ class Forecast:
             self._output_path = os.path.abspath('.')
         if not os.path.isdir(self.output_path):
             os.mkdir(self.output_path)
-        return 0
     
     def get_available_days(self, reset=True):
         if reset:
@@ -89,40 +121,6 @@ class Forecast:
                 return fcs
             else:
                 return forecasts
-            
-    # def get_available_forecast_hours(self, date, forecast, vars):
-    #     if self.source == 'EC':
-    #         url = f'{self._get_forecast_url(date)}/{forecast}'
-    #     elif self.source == 'NOAA':
-    #         if 'hrrr' in self.model.lower():
-    #             url = self._get_forecast_url(date)
-    #         elif 'gfs' in self.model.lower():
-    #             url = self._get_forecast_url(date) + f'{forecast}/atmos/'
-    #         else:
-    #             url = self._get_forecast_url(date)
-    #     else:
-    #         assert False, f'Model source "{self.source}" not supported...'
-    #     hours = self._get_available_forecasthrs(url, forecast, vars)
-    #     return hours
-    
-    def get_nowcast(self):
-        dates = self.get_available_days()
-        inputs = []
-        for date in dates:
-            fcs = self.get_available_forecasts(date)
-            for fc in fcs:
-                inputs.append((date, fc))
-        inputs = inputs[::-1]
-        for inp in inputs:
-            date, forecast = inp 
-            files = self.get_available_files(date, forecast)
-            if len(files) == 0:
-                if len(inputs) == 1:
-                    return date, forecast
-                else:
-                    pass
-            else:
-                return date, forecast
 
     def get_available_files(self, date, forecast):
         if self.source == 'EC':
@@ -183,8 +181,8 @@ class Forecast:
         # #
         # #
         # #hack for now
-        # out_files = [l for l in out_files if l.lower().endswith('.grib2')]
-        # out_files = out_files[:1]
+        out_files = [l for l in out_files if l.lower().endswith('.grib2')]
+        out_files = out_files[:1]
         # print(out_files)
         # #
         # #
@@ -196,143 +194,227 @@ class Forecast:
         return out_files
     
     def set_stream_params(self, startdate, startforecast, variables, sleep, verify=True, convert_to_dfs=False,
-                          auto_delete=True):
+                          auto_delete=True, logging=True):
         self._stream_params = {'startdate': startdate,
                                'startforecast': startforecast,
                                'variables': variables,
                                'sleep': sleep,
                                'convert': convert_to_dfs,
-                               'delete': auto_delete}
+                               'delete': auto_delete,
+                               'logging': logging,
+                               'verify': verify}
         if verify:
             self._verify_stream_params()
-        return 0
     
     def download(self, check_output_path=False):
         links = self.get_download_files(check_output_path=check_output_path)
         for link in tqdm(links, desc=f'Downloading files...'):
-            self._download_grib_file(link, self._download_path)
-        return 0
+            self._download_file(link, self._download_path)
     
-    def stream(self, verify=True):
-        #initially set to starting stream params
-        p = self.stream_params
-        day = p['startdate']
-        forecast = p['startforecast']
-        vars = p['variables']
-        convert = p['convert']
-        delete = p['delete']
-        while True:
-            print(f'Download parameters - date : {day}, forecast : {forecast}, vars : {vars}')
-            #reset
-            nextfc = False
-            nextday = False
-            #start timer
-            t1 = dt.now()
-            #set the download parameters
-            self.set_download_params(day, forecast, vars, verify=verify)
-            #get the new files to download based on current parameters
-            files = self.get_download_files(check_output_path=True)
-            #check which forecast we're on
-            allfc = self.get_available_forecasts(day)
-            #what days are even available
-            alldays = self.get_available_days(reset=False)
-            #if no files, next fc... if files, download them
-            if len(files) == 0:
-                #if its the latest forecast, might not be downloaded yet
-                if day==alldays[-1] and forecast==allfc[-1]:
-                    print('Monitoring latest forecast, but no data. Waiting...')
-                    nextfc = False
-                else:
-                    print('Already fetched all files for this forecast...')
-                    nextfc = True
-                    if convert:
-                        print(f"Converting this forecast into DFS format...")
-                        to_dfs(self._download_path, self.source, self.model, self.download_params['variables'])
-                        if delete:
-                            print("Removing original raw files...")
-                            remove_dfs(self._download_path, self.source, self.model, self.download_params['variables'])
-            else:
-                print('Downloading files...')
+    def stream(self):
+        #global catch all for now
+        try:
+            #initially set to starting stream params
+            p = self.stream_params
+            day = p['startdate']
+            forecast = p['startforecast']
+            vars = p['variables']
+            convert = p['convert']
+            delete = p['delete']
+            logging = p['logging']
+            verify = p['verify']
+            #logging
+            log_file = f'{self.output_path}/{self.source}_{self.model}_{dt.utcnow().isoformat().replace(":","-")}.log'
+            if logging:
+                f = open(log_file, 'w')
+                f.write('STARTING PARAMETERS:\n')
+                f.write(day+'\n')
+                f.write(forecast+'\n')
+                f.write(str(vars)+'\n')
+                f.write(str(convert)+'\n')
+                f.write(str(delete)+'\n')
+                f.flush()
+            while True:
+                print(f'{self.model} download parameters - date : {day}, forecast : {forecast}, vars : {vars}')
+                #reset switches
                 nextfc = False
-                self.download(check_output_path=True)
-            #do we need to switch days
-            if forecast == allfc[-1] and nextfc:
-                print('Already on last forecast, switching to next day...')
-                nextday = True
-            else:
-                print('Still more forecasts or more data in current forecast, staying on this day...')
-                nextday = False                
-            #can we switch days
-            if day == alldays[-1]:
-                canswitch = False
-            else:
-                canswitch = True
-            #EC specific
-            if self.source == 'EC':
-                if ((dt.utcnow().hour < int(forecast))):
-                    nextfc = True
-                    nextday = True
-                    alldays = self.get_available_days()
-                    print('EC model - UTC day has switched over. Switching to next day to avoid downloading duplicated data...')
-            else:
-                pass
-            #decide what the next download is
-            if nextfc and not nextday:
-                print('NEXT STEP: next forecast on the current day...')
-                forecast = allfc[allfc.index(forecast)+1]
-            elif nextfc and nextday:
-                print('Need to switch to next forecast and day...')
-                if canswitch:
-                    print('NEXT STEP: next forecast on the next day...')
-                    if self.source == 'EC':
-                        day = alldays[-1]
+                nextday = False
+                #start timer
+                t1 = dt.now()
+                if logging:
+                    f.write(f"\n{t1}\n")
+                    f.write(f'{self.model} download parameters - date : {day}, forecast : {forecast}, vars : {vars}\n')
+                    f.flush()
+                #set the download parameters
+                self.set_download_params(day, forecast, vars, verify=verify)
+                #get the new files to download based on current parameters
+                files = self.get_download_files(check_output_path=True)
+                if logging:
+                    f.write(f"Available Files to Download:\n")
+                    for file in files:
+                        f.write(file+'\n')
+                    f.flush()
+                #check which forecast we're on
+                allfc = self.get_available_forecasts(day)
+                if logging:
+                    f.write(f"Available Forecasts on this day:\n")
+                    for fc in allfc:
+                        f.write(fc+'\n')
+                #what days are even available
+                alldays = self.get_available_days(reset=False)
+                if logging:
+                    f.write(f"Available Days:\n")
+                    for d in alldays:
+                        f.write(d+'\n')
+                    f.flush()
+                #if no files, next fc... if files, download them
+                if len(files) == 0:
+                    #if its the latest forecast, might not be downloaded yet
+                    if day==alldays[-1] and forecast==allfc[-1]:
+                        if logging:
+                            f.write('Monitoring latest forecast, but no data. Waiting...\n')
+                        nextfc = False
                     else:
-                        day = alldays[alldays.index(day)+1]
-                    newfcs = self.get_available_forecasts(day)
-                    forecast = newfcs[0]
+                        if logging:
+                            f.write('Already fetched all files for this forecast...\n')
+                            f.flush()
+                        nextfc = True
+                        if convert:
+                            if logging:
+                                f.write(f"Converting this forecast into DFS format...\n")
+                                f.flush()
+                            to_dfs(self._download_path, self.source, self.model, self.download_params['variables'])
+                            if delete:
+                                if logging:
+                                    f.write("Removing original raw files...\n")
+                                    f.flush()
+                                remove_dfs(self._download_path, self.source, self.model, self.download_params['variables'])
                 else:
-                    print('NEXT STEP: no new day of data yet...')
+                    if logging:
+                        f.write('Downloading files...\n')
+                        f.flush()
+                    nextfc = False
+                    self.download(check_output_path=True)
+                #do we need to switch days
+                if forecast == allfc[-1] and nextfc:
+                    if logging:
+                        f.write('Already on last forecast, switching to next day...\n')
+                        f.flush()
+                    nextday = True
+                else:
+                    if logging:
+                        f.write('Still more forecasts or more data in current forecast, staying on this day...\n')
+                        f.flush()
+                    nextday = False                
+                #can we switch days
+                if day == alldays[-1]:
+                    canswitch = False
+                    if logging:
+                        f.write('Already on last day, cannot switch to next day yet...\n')
+                        f.flush()
+                else:
+                    canswitch = True
+                    if logging:
+                        f.write('Not on last day, can switch to next day...\n')
+                        f.flush()
+                #EC specific
+                if self.source == 'EC':
+                    if ((dt.utcnow().hour < int(forecast))):
+                        canswitch = True
+                        nextfc = True
+                        nextday = True
+                        alldays = self.get_available_days()
+                        if logging:
+                            f.write('EC model - UTC day has switched over. Switching to next day to avoid downloading duplicated data...\n')
+                            f.write(f"Available Days:\n")
+                            for d in alldays:
+                                f.write(d+'\n')
+                            f.flush()
+                else:
                     pass
-            elif not nextfc and not nextday:
-                print('NEXT STEP: check current forecast again for more data...')
-                pass
-            t2 = dt.now()
-            delta = (t2-t1).total_seconds()
-            if delta < p['sleep']:
-                wait = p['sleep'] - delta
-                print('Waiting...')
-                sleep(wait)
-                          
+                #decide what the next download is
+                if nextfc and not nextday:
+                    if logging:
+                        f.write('NEXT STEP: next forecast on the current day...\n')
+                        f.flush()
+                    forecast = allfc[allfc.index(forecast)+1]
+                elif nextfc and nextday:
+                    if logging:
+                        f.write('Need to switch to next forecast and day...\n')
+                        f.flush()
+                    if canswitch:
+                        if logging:
+                            f.write('NEXT STEP: can switch, next forecast on the next day...\n')
+                            f.flush()
+                        if self.source == 'EC':
+                            day = alldays[-1]
+                        else:
+                            day = alldays[alldays.index(day)+1]
+                        newfcs = self.get_available_forecasts(day)
+                        forecast = newfcs[0]
+                    else:
+                        if logging:
+                            f.write('NEXT STEP: no new day of data yet...\n')
+                            f.flush()
+                        pass
+                elif not nextfc and not nextday:
+                    if logging:
+                        f.write('NEXT STEP: check current forecast again for more data...\n')
+                        f.flush()
+                    pass
+                t2 = dt.now()
+                delta = (t2-t1).total_seconds()
+                if logging:
+                    f.write(f"{t2} took {delta} sec\n")
+                    f.flush()
+                if delta < p['sleep']:
+                    wait = p['sleep'] - delta
+                    if logging:
+                        f.write('Waiting...\n')
+                        f.flush()
+                    sleep(wait)
+        #if something goes wrong, assume reinitializing on latest forecast date
+        except Exception as err:       
+            if logging:
+                f.write(repr(err)+'\n')
+                f.flush()
+            #check if last download settings still valid
+            alldays = self.get_available_days()
+            if day in alldays:
+                newday = day
+                allfcs = self.get_available_forecasts(day)
+                if forecast in allfcs:
+                    newfc = forecast
+                else:
+                    newfc = allfcs[-1]
+            else:
+                newday = alldays[0]
+                newfc = self.get_available_forecasts(newday)[0]
+            #reset streaming parameters
+            if logging:
+                f.write(f'RESETTING STREAM PARAMETERS TO {newday} {newfc}\n')
+                f.flush()
+                f.close()  
+            self.set_stream_params(newday, 
+                                   newfc,
+                                   self.stream_params['variables'], 
+                                   self.stream_params['sleep'],
+                                   convert_to_dfs=self.stream_params['convert'],
+                                   auto_delete=self.stream_params['delete'],
+                                   logging=self.stream_params['logging'])
+            #restart streaming
+            self.stream()
+                     
     ############################################################################
     ############################################################################
-    
-    #get model resolution
-    def _get_resolution(self):
-        res = {'HRDPS_continental': 2.5,
-               'HRDPS_north': 2.5,
-               'RDPS': 10,
-               'GDPS': 15,
-               'GEPS': 50,
-               'HRRR_conus':3,
-               'HRRR_alaska':12,
-               'GFS_0p25':25,
-               'GFS_0p50':50,
-               'GFS_1p00':100,
-               'NAM_bgrdsf': 12,
-               'NAM_conusnest': 3,
-               'NAM_alaskanest': 3,
-               'NAM_hawaiinest': 2.5,
-               'NAM_prinest': 2.5,
-               'CFS': 50}
-        return f'{res[self.model]} km'
     
     #get model website
     def _get_meta_url(self):
         url = {'HRDPS_continental': 'https://eccc-msc.github.io/open-data/msc-data/nwp_hrdps/readme_hrdps-datamart_en/#high-resolution-deterministic-prediction-system-hrdps-data-in-grib2-format',
                'HRDPS_north': 'https://eccc-msc.github.io/open-data/msc-data/nwp_hrdps/readme_hrdps-datamart_en/#high-resolution-deterministic-prediction-system-hrdps-data-in-grib2-format',
-               'RDPS': 'https://weather.gc.ca/grib/grib2_reg_10km_e.html',
-               'GDPS': 'https://weather.gc.ca/grib/grib2_glb_25km_e.html',
-               'GEPS': 'https://weather.gc.ca/grib/grib2_ens_geps_e.html',
+               'RDPS': 'https://eccc-msc.github.io/open-data/msc-data/nwp_rdps/readme_rdps-datamart_en/',
+               'GDPS': 'https://eccc-msc.github.io/open-data/msc-data/nwp_gdps/readme_gdps-datamart_en/',
+               'GEPS': 'https://eccc-msc.github.io/open-data/msc-data/nwp_geps/readme_geps-datamart_en/',
                'HRRR_conus': 'https://www.nco.ncep.noaa.gov/pmb/products/hrrr',
                'HRRR_alaska': 'https://www.nco.ncep.noaa.gov/pmb/products/hrrr',
                'GFS_0p25':'https://www.emc.ncep.noaa.gov/emc/pages/numerical_forecast_systems/gfs.php',
@@ -365,6 +447,25 @@ class Forecast:
                'NAM_prinest': 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod',
                'CFS': 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-9-month-forecast/time-series'}
         return url[self.model]
+    
+    def _get_supported_vars(self):
+        vrs = {'HRDPS_continental': ['WIND_AGL-10m','WDIR_AGL-10m','PRES_Sfc', 'PRMSL_MSL', 'UGRD_AGL-10m','VGRD_AGL-10m'],
+               'HRDPS_north': ['UGRD_TGL_10','VGRD_TGL_10','PRES_SFC', 'PRMSL_MSL', 'WDIR_TGL_10','WIND_TGL_10'],
+               'RDPS': ['WIND_TGL_10','WDIR_TGL_10','PRES_SFC', 'PRMSL_MSL', 'UGRD_TGL_10','VGRD_TGL_10'],
+               'GDPS': ['WIND_TGL_10','WDIR_TGL_10','PRES_SFC', 'PRMSL_MSL', 'UGRD_TGL_10','VGRD_TGL_10'],
+               'GEPS': ['WIND_TGL_10','PRES_SFC', 'PRMSL_MSL', 'UGRD_TGL_10m','VGRD_TGL_10m'],
+               'HRRR_conus': ['wrfsfc'],
+               'HRRR_alaska': ['wrfsfc'],
+               'GFS_0p25': ['pgrb2','pgrb2b','pgrb2full'],
+               'GFS_0p50': ['pgrb2','pgrb2b','pgrb2full'],
+               'GFS_1p00': ['pgrb2','pgrb2b','pgrb2full'],
+               'NAM_bgrdsf': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
+               'NAM_conusnest': ['u10', 'v10', 'sp'],
+               'NAM_alaskanest': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
+               'NAM_hawaiinest': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
+               'NAM_prinest': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
+               'CFS': ['pressfc', 'wnd10m', 'tmpsfc']}
+        return vrs[self.model]
     
     def _get_available_days(self, nowcast=False):
         if self.source in ['NOAA']:
@@ -452,87 +553,7 @@ class Forecast:
             if fc is not None:
                 forecasts.append(fc.group(1))
         return sorted(list(set(forecasts)))
-    
-    # def _get_available_forecasthrs(self, url, forecast, vars):
-    #     if self.source == 'EC':
-    #         lookup = '^(\d+)/'
-    #         page = requests.get(url) 
-    #         soup = bs(page.text, features="html.parser")
-    #         matches = soup.find_all('a')
-    #         hours = {v:[] for v in vars}
-    #         for match in matches:
-    #             h = match.get('href')
-    #             hh = re.search(lookup, h)
-    #             if hh is not None:
-    #                 hr = hh.group(1)
-    #                 for var in vars:
-    #                     hours[var].append(int(hr))
-    #         for var in vars:
-    #             hours[var] = np.unique(hours[var])
-    #         return hours
-    #     elif self.source == 'NOAA':
-    #         if 'hrrr' in self.model.lower():
-    #             lookup = '.(wrf\w*)f(\d{2}).'
-    #             page = requests.get(url) 
-    #             soup = bs(page.text, features="html.parser")
-    #             matches = soup.find_all('a')
-    #             hours = {v:[] for v in vars}
-    #             for match in matches:
-    #                 h = match.get('href')
-    #                 if ((f'.t{forecast}z.' in h) and
-    #                     (any([v in h for v in vars]))):
-    #                     hh = re.search(lookup, h)
-    #                     if hh is not None:
-    #                         var, hr = hh.group(1), hh.group(2)
-    #                         if var not in vars:
-    #                             pass
-    #                         else:
-    #                             hours[var].append(int(hr))
-    #         for var in vars:
-    #             hours[var] = np.unique(hours[var])
-    #         return hours
-    #     elif 'gfs' in self.model.lower():
-    #         res = self.model.lower().split('_')[1]
-    #         lookup = '.' + res + '.f(\d{3})'
-    #         page = requests.get(url) 
-    #         soup = bs(page.text, features="html.parser")
-    #         matches = soup.find_all('a')
-    #         hours = {v:[] for v in vars}
-    #         for match in matches:
-    #             h = match.get('href')
-    #             hh = re.search(lookup, h)
-    #             if hh is not None:
-    #                 hr = hh.group(1)
-    #                 var = [v for v in vars if f'.{v}.' in h]
-    #                 if len(var) == 0:
-    #                     pass
-    #                 else:
-    #                     hours[var[0]].append(int(hr))
-    #         for var in vars:
-    #             hours[var] = np.unique(hours[var])
-    #         return hours
-    #     else:
-    #         assert False, f'Model source "{self.source}" not supported...'
-    
-    def _get_supported_vars(self):
-        vrs = {'HRDPS_continental': ['WIND_AGL-10m','WDIR_AGL-10m','PRES_Sfc', 'WIND_Sfc', 'WDIR_Sfc', 'WSPD_Sfc', 'PRMSL_MSL'],
-               'HRDPS_north': ['WIND_AGL-10','WDIR_AGL-10','PRES_Sfc', 'WIND_Sfc', 'WDIR_Sfc', 'WSPD_sfc'],
-               'RDPS': ['WIND_TGL_10','WDIR_TGL_10','PRES_SFC_0'],
-               'GDPS': ['WIND_TGL_10','WDIR_TGL_10','PRES_SFC_0'],
-               'GEPS': ['WIND_TGL_10','WDIR_TGL_10','PRES_SFC_0'],
-               'HRRR_conus': ['wrfsfc'],
-               'HRRR_alaska': ['wrfsfc'],
-               'GFS_0p25': ['pgrb2','pgrb2b','pgrb2full'],
-               'GFS_0p50': ['pgrb2','pgrb2b','pgrb2full'],
-               'GFS_1p00': ['pgrb2','pgrb2b','pgrb2full'],
-               'NAM_bgrdsf': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
-               'NAM_conusnest': ['u10', 'v10', 'sp'],
-               'NAM_alaskanest': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
-               'NAM_hawaiinest': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
-               'NAM_prinest': ['alaskanest','conusnest','prinest','hawaiinest', 'bgrdsf'],
-               'CFS': ['pressfc', 'wnd10m', 'tmpsfc']}
-        return vrs[self.model]
-            
+                
     def _verify_download_params(self):
         p = self.download_params
         #check date available
@@ -551,7 +572,7 @@ class Forecast:
         return 0 
     
     def _verify_stream_params(self):
-        print('Verfiying the stream parameters are valid before commencing...')
+        # print('Verfiying the stream parameters are valid before commencing...')
         p = self.stream_params
         #check date available
         dates = self.get_available_days()
@@ -585,7 +606,7 @@ class Forecast:
             assert False, f'Model source "{self.source}" not supported...'
         return links
     
-    def _download_grib_file(self, link, out_pth):
+    def _download_file(self, link, out_pth):
         if not os.path.isdir(out_pth):
             os.mkdir(out_pth)
         filename = os.path.basename(link)

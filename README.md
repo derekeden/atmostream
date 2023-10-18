@@ -4,7 +4,7 @@
 
 # *atmostream* - A Python approach to working with atmospheric forecast model data
 
-This is a library that is meant to work with Environment Canada and NOAA atmospheric forecast products.
+This is a library that is used to work with Environment Canada and NOAA/NCEP atmospheric forecast products.
 
 Each one of these products provide atmospheric forecast data at regular intervals everyday (in grib format), with limited to no historical archived data.
 
@@ -37,4 +37,8 @@ This library should work on both Windows and Linux, Python versions 3.9+.
 
 ## Examples
 
-See the examples.py script in the repository. It shows how to set up a streaming service for each of the supported forecast products.
+See the examples.py script in the repository. 
+
+It shows how to set up a streaming service for each of the supported forecast products.
+
+Simply start streaming, and watch the data start to collect!

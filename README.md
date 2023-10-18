@@ -6,6 +6,10 @@
 
 This is a library that is meant to work with Environment Canada and NOAA atmospheric forecast products.
 
+Each one of these products provide atmospheric forecast data at regular intervals everyday (in grib format), with limited to no historical archived data.
+
+This library makes it easy to download, or continuously stream the latest raw forecast data to your local machine. There are also utilities to convert to MIKE DFS file formats on the fly.
+
 Currently, the supported forecast products are:
 
 HRDPS Continental
@@ -16,8 +20,6 @@ GEPS
 NAM CONUS Nest
 
 And more are being added.
-
-This library makes it easy to download, or continuously stream the latest raw forecast data to your local machine. There are also utilities to convert to MIKE DFS file formats on the fly.
 
 ## Installation
 

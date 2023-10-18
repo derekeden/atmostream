@@ -1,5 +1,5 @@
 <p align="left">
-<img src="https://github.com/derekeden/atmostream/assets/36650862/f4612ced-8885-46e3-a5db-633fd49751cd" alt="sidepanel" width="250"  style="display: block; margin-right: auto;">
+<img src="./atmostream/logo.png" alt="sidepanel" width="250"  style="display: block; margin-right: auto;">
 </p>
 
 # *atmostream* - A Python approach to working with atmospheric forecast model data
